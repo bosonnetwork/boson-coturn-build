@@ -1,0 +1,7 @@
+# Build artifacts (downloads, extracted src, staging, stamps)
+build/
+# Final binaries
+output/
+
+# macOS Finder metadata
+.DS_Store

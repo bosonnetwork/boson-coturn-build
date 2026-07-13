@@ -1,0 +1,31 @@
+# Builds a fully static (musl libc) turnserver binary.
+#
+# All build logic lives in linux.mk (shared with native Linux builds) — this
+# Dockerfile just provides the toolchain, copies the .mk files in, and runs
+# `make -f linux.mk`. Invoked per-arch via
+# `docker buildx build --platform linux/amd64|linux/arm64`; every step runs
+# natively under that target platform (QEMU-emulated when cross), so no
+# cross-compiler toolchain is needed. linux.mk targets the native arch and
+# names its output turnserver-linux-<arch> accordingly.
+
+# syntax=docker/dockerfile:1
+
+FROM debian:bookworm-slim AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential make curl ca-certificates perl pkg-config file \
+        linux-libc-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# The three .mk files are all linux.mk needs (it includes common.mk, which
+# includes version.mk). Copied into the workdir so `include` resolves.
+COPY version.mk common.mk linux.mk ./
+
+RUN make -f linux.mk
+
+# Export stage: buildx `--target export -o type=local,dest=...` writes the
+# contents of / here, i.e. the built binary, to the host output directory.
+FROM scratch AS export
+COPY --from=builder /build/output/ /
