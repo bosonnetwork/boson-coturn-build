@@ -78,7 +78,8 @@ $(STAMP)-openssl.stamp: $(DL_DIR)/openssl-$(OPENSSL_VERSION).tar.gz $(STAMP)-mus
 			--openssldir="$(STAGING)/openssl/ssl" \
 			--libdir=lib \
 			no-shared no-dso no-async no-engine no-tests no-comp \
-			-DOPENSSL_NO_SECURE_MEMORY && \
+			-DOPENSSL_NO_SECURE_MEMORY \
+			$(OPENSSL_HARDENING) && \
 		make -j$(NPROC) && \
 		make install_sw
 	touch $@
@@ -96,7 +97,7 @@ $(STAMP)-libevent.stamp: $(DL_DIR)/libevent-$(LIBEVENT_VERSION).tar.gz $(STAMP)-
 			--prefix="$(STAGING)/libevent" \
 			--disable-shared --enable-static \
 			--disable-samples --disable-libevent-regress \
-			CFLAGS="-static" \
+			CFLAGS="-static $(HARDENING_CFLAGS)" \
 			CPPFLAGS="-I$(STAGING)/openssl/include" \
 			LDFLAGS="-L$(STAGING)/openssl/lib" \
 			PKG_CONFIG_PATH="$(STAGING)/openssl/lib/pkgconfig" && \
@@ -115,19 +116,20 @@ $(STAMP)-coturn.stamp: $(DL_DIR)/coturn-$(COTURN_VERSION).tar.gz $(STAMP)-libeve
 	tar xzf $< -C $(SRC)/coturn --strip-components=1
 	cd $(SRC)/coturn && \
 		CC="$(MUSL_GCC)" \
-		CFLAGS="-static -I$(STAGING)/openssl/include -I$(STAGING)/libevent/include" \
+		CFLAGS="-static $(HARDENING_CFLAGS) $(COTURN_EXTRA_CFLAGS) -I$(STAGING)/openssl/include -I$(STAGING)/libevent/include" \
 		LDFLAGS="-static -L$(STAGING)/openssl/lib -L$(STAGING)/libevent/lib" \
 		SSL_CFLAGS="-I$(STAGING)/openssl/include" \
 		SSL_LIBS="$(STAGING)/openssl/lib/libssl.a $(STAGING)/openssl/lib/libcrypto.a" \
 		EVENT_CFLAGS="-I$(STAGING)/libevent/include" \
 		EVENT_LIBS="$(STAGING)/libevent/lib/libevent.a $(STAGING)/libevent/lib/libevent_openssl.a $(STAGING)/libevent/lib/libevent_pthreads.a" \
 		$(COTURN_FEATURE_FLAGS) \
-		./configure --prefix="$(STAGING)/coturn" && \
+		./configure $(COTURN_CONFIGURE_EXTRA) && \
 		make -j$(NPROC)
 	touch $@
 
 $(BINARY): $(STAMP)-coturn.stamp | $(OUTPUT_DIR)
 	cp $(SRC)/coturn/bin/turnserver $@
+	strip --strip-all $@
 
 # --- Verify (native) --------------------------------------------------------
 # A fully static ELF has no interpreter and no NEEDED entries.

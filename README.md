@@ -79,9 +79,9 @@ Pinned in [`version.mk`](version.mk):
 | Component | Version |
 |-----------|---------|
 | musl | 1.2.6 |
-| OpenSSL | 3.6.3 |
+| OpenSSL | 3.5.9 |
 | libevent | 2.1.13-stable |
-| coturn | 4.14.0 |
+| coturn | 4.18.0 |
 
 Each platform builds the same four phases: **musl** (Linux only) → **OpenSSL** → **libevent** →
 **coturn**, using coturn's own `./configure` (not CMake).
@@ -90,10 +90,33 @@ Each platform builds the same four phases: **musl** (Linux only) → **OpenSSL**
 
 The build disables every optional database and metrics backend so nothing links dynamically
 against a library that happens to be installed on the build host (which would break the static
-goal). Disabled: MySQL, PostgreSQL, MongoDB, Redis, SQLite, Prometheus, systemd, SCTP.
+goal). **Disabled:** MySQL, PostgreSQL, MongoDB, Redis, SQLite, Prometheus (and with it the
+libmicrohttpd dependency), systemd, SCTP, OAuth.
 
-**Enabled:** STUN/TURN, TLS/DTLS, and the TURN REST API + OAuth (these use only libcrypto, so
-they add no dynamic-link risk). See `COTURN_FEATURE_FLAGS` in [`version.mk`](version.mk).
+**Enabled:** STUN/TURN over UDP/TCP and TLS/DTLS, plus the TURN REST API (`--use-auth-secret`
+/ `--static-auth-secret`). These use only libcrypto, so they add no dynamic-link risk. The
+telnet CLI and the HTTPS web-admin are compiled in but **off by default** (`--cli` /
+`--web-admin`) and pull in no extra dependency. Feature toggles live in `COTURN_FEATURE_FLAGS`;
+OAuth is turned off via `COTURN_EXTRA_CFLAGS` — coturn's `TURN_NO_OAUTH` environment knob is
+broken upstream (see [`version.mk`](version.mk)).
+
+DTLS is compiled in but stays a per-deployment runtime decision: DTLS listeners only start when
+`--dtls` is given, so it can be disabled without rebuilding.
+
+The binary is configured with `--prefix=/usr/local --turndbdir=/var/lib/coturn --disable-rpath`
+so no throwaway build-staging path is baked into it; run it with `-n` (skip the config file) and
+explicit options.
+
+## Hardening and size
+
+Every component is compiled with `-fstack-protector-strong -D_FORTIFY_SOURCE=2`. coturn and
+libevent additionally get `-O2` — coturn's own `configure`/`Makefile.in` add **no** `-O` at all,
+so without it the relay would be built at `-O0` (and `_FORTIFY_SOURCE` would be inert). OpenSSL
+already builds at `-O3`, so it only receives the two security flags. See `HARDENING_CFLAGS` /
+`OPENSSL_HARDENING` in [`version.mk`](version.mk).
+
+The binaries are stripped as part of the build (`strip --strip-all` on Linux, `strip -x` on
+macOS) to keep the artifacts small for embedding; stripping does not affect static linkage.
 
 ## Verification
 
@@ -104,7 +127,7 @@ static linkage:
 == file ==   ELF 64-bit LSB executable, ..., statically linked
 == ldd ==    not a dynamic executable
 == readelf -d (NEEDED entries) ==  (none)
-== run ==    4.14.0
+== run ==    4.18.0
 ```
 
 `make verify-darwin-universal` uses `file`, `lipo -info`, and `otool -L`, expecting a fat binary

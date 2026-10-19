@@ -60,6 +60,7 @@ define DARWIN_BUILD
 
 darwin-$(1): $(STAMP_DIR)/darwin-$(1)-coturn.stamp | $(OUTPUT_DIR)
 	cp $$(DARWIN_SRC_$(1))/coturn/bin/turnserver $(OUTPUT_DIR)/turnserver-darwin-$(1)
+	strip -x $(OUTPUT_DIR)/turnserver-darwin-$(1)
 
 $(STAMP_DIR)/darwin-$(1)-openssl.stamp: $(DARWIN_DL_DIR)/openssl-$(OPENSSL_VERSION).tar.gz | $(STAMP_DIR)
 	rm -rf $$(DARWIN_SRC_$(1))/openssl
@@ -69,7 +70,8 @@ $(STAMP_DIR)/darwin-$(1)-openssl.stamp: $(DARWIN_DL_DIR)/openssl-$(OPENSSL_VERSI
 		CC="clang -arch $(1)" ./Configure $(2) \
 			--prefix="$$(DARWIN_STAGING_$(1))/openssl" \
 			--openssldir="$$(DARWIN_STAGING_$(1))/openssl/ssl" \
-			no-shared no-dso no-tests no-comp -DOPENSSL_NO_SECURE_MEMORY && \
+			no-shared no-dso no-tests no-comp -DOPENSSL_NO_SECURE_MEMORY \
+			$$(OPENSSL_HARDENING) && \
 		make -j$(NPROC) && \
 		make install_sw
 	touch $$@
@@ -84,6 +86,7 @@ $(STAMP_DIR)/darwin-$(1)-libevent.stamp: $(DARWIN_DL_DIR)/libevent-$(LIBEVENT_VE
 			--prefix="$$(DARWIN_STAGING_$(1))/libevent" \
 			--disable-shared --enable-static \
 			--disable-samples --disable-libevent-regress \
+			CFLAGS="$$(HARDENING_CFLAGS)" \
 			CPPFLAGS="-I$$(DARWIN_STAGING_$(1))/openssl/include" \
 			LDFLAGS="-L$$(DARWIN_STAGING_$(1))/openssl/lib" \
 			PKG_CONFIG_PATH="$$(DARWIN_STAGING_$(1))/openssl/lib/pkgconfig" && \
@@ -97,14 +100,14 @@ $(STAMP_DIR)/darwin-$(1)-coturn.stamp: $(DARWIN_DL_DIR)/coturn-$(COTURN_VERSION)
 	tar xzf $$< -C $$(DARWIN_SRC_$(1))/coturn --strip-components=1
 	cd $$(DARWIN_SRC_$(1))/coturn && \
 		CC="clang -arch $(1)" \
-		CFLAGS="-I$$(DARWIN_STAGING_$(1))/openssl/include -I$$(DARWIN_STAGING_$(1))/libevent/include" \
+		CFLAGS="$$(HARDENING_CFLAGS) $$(COTURN_EXTRA_CFLAGS) -I$$(DARWIN_STAGING_$(1))/openssl/include -I$$(DARWIN_STAGING_$(1))/libevent/include" \
 		LDFLAGS="-L$$(DARWIN_STAGING_$(1))/openssl/lib -L$$(DARWIN_STAGING_$(1))/libevent/lib" \
 		SSL_CFLAGS="-I$$(DARWIN_STAGING_$(1))/openssl/include" \
 		SSL_LIBS="$$(DARWIN_STAGING_$(1))/openssl/lib/libssl.a $$(DARWIN_STAGING_$(1))/openssl/lib/libcrypto.a" \
 		EVENT_CFLAGS="-I$$(DARWIN_STAGING_$(1))/libevent/include" \
 		EVENT_LIBS="$$(DARWIN_STAGING_$(1))/libevent/lib/libevent.a $$(DARWIN_STAGING_$(1))/libevent/lib/libevent_openssl.a $$(DARWIN_STAGING_$(1))/libevent/lib/libevent_pthreads.a" \
 		$(COTURN_FEATURE_FLAGS) \
-		./configure --prefix="$$(DARWIN_STAGING_$(1))/coturn" && \
+		./configure $$(COTURN_CONFIGURE_EXTRA) && \
 		make -j$(NPROC)
 	touch $$@
 
