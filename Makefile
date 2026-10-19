@@ -8,6 +8,7 @@
 #   macos.mk    — native macOS build (universal by default)
 #   linux.mk    — native musl static build; also run inside the container
 #   docker/Dockerfile.musl — copies the .mk files in and runs `make -f linux.mk`
+#   release.mk  — license notices, release tarball, SHA256SUMS + signature
 #
 # Linux developers don't need this file or Docker — they can build natively:
 #   make -f linux.mk
@@ -18,6 +19,8 @@ include common.mk
 # this the default goal would be the first of those ($(BUILD_DIR)) rather than
 # `all`. Set it explicitly.
 .DEFAULT_GOAL := all
+
+include release.mk
 
 .PHONY: all \
         linux linux-amd64 linux-arm64 \

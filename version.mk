@@ -52,3 +52,10 @@ OPENSSL_HARDENING := -fstack-protector-strong -D_FORTIFY_SOURCE=2
 # conventional system paths instead. --disable-rpath is a no-op for a fully
 # static binary but keeps the link line clean.
 COTURN_CONFIGURE_EXTRA := --prefix=/usr/local --turndbdir=/var/lib/coturn --disable-rpath
+
+# Release identity. A release is "<coturn version>-<build number>": bump
+# RELEASE_BUILD whenever the same coturn version is rebuilt (an OpenSSL or
+# libevent update, a flag change), and reset it to 1 on a new coturn version.
+# The tag, the tarball name and the version consumers pin all derive from it.
+RELEASE_BUILD   := 1
+RELEASE_VERSION := $(COTURN_VERSION)-$(RELEASE_BUILD)

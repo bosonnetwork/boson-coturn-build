@@ -52,6 +52,9 @@ Run from a macOS host via the root `Makefile`:
 | `make darwin-arm64` / `make darwin-x86_64` | A single-arch macOS slice |
 | `make verify` | `verify-linux-amd64` + `verify-linux-arm64` + `verify-darwin-universal` |
 | `make verify-linux-amd64` | Static-ness check inside a clean `debian:bookworm-slim` container |
+| `make licenses` | `output/licenses/` - each component's license notice, from the pinned sources |
+| `make dist` | `output/dist/boson-coturn-<version>.tar.gz` + `SHA256SUMS`, unsigned |
+| `make release` | `dist` + `SHA256SUMS.asc` signed by the Boson release key (see [Releasing](#releasing)) |
 | `make clean` | Remove build artifacts, keep downloaded tarballs |
 | `make distclean` | Remove everything, including downloads |
 
@@ -71,6 +74,9 @@ can build natively without Docker or any macOS logic.
 | [`macos.mk`](macos.mk) | Native clang build; produces the universal binary by default. |
 | [`Makefile`](Makefile) | Root orchestrator (for macOS hosts): Linux via buildx, macOS delegated to `macos.mk`. |
 | [`docker/Dockerfile.musl`](docker/Dockerfile.musl) | Toolchain image: installs deps, copies the `.mk` files in, runs `make -f linux.mk`. |
+| [`release.mk`](release.mk) | Release packaging (included by `Makefile`): license notices, tarball, `SHA256SUMS`, signature. |
+| [`scripts/sign-release.sh`](scripts/sign-release.sh) | Signs `SHA256SUMS` with the release key and verifies it against the committed key. |
+| [`keys/boson-release.asc`](keys/boson-release.asc) | The Boson release public key (`5A01 2C93 0EED B923 B7AB 4739 A13B 99C0 C4AA 495A`). |
 
 ## Component versions
 
@@ -133,3 +139,39 @@ static linkage:
 `make verify-darwin-universal` uses `file`, `lipo -info`, and `otool -L`, expecting a fat binary
 whose slices depend only on `libSystem`/`libresolv`.
 
+
+## Releasing
+
+A release is `<coturn version>-<build number>` (`RELEASE_VERSION` in [`version.mk`](version.mk),
+e.g. `4.18.0-1`). Bump `RELEASE_BUILD` when the same coturn version is rebuilt (an OpenSSL or
+libevent update, a flag change); reset it to `1` on a new coturn version.
+
+On a macOS host, from a clean, committed tree:
+
+```bash
+make            # build all binaries
+make verify     # check them
+make release    # package + sign exactly what was verified
+```
+
+`make release` never builds: it packages the binaries already in `output/`, refuses a dirty
+tree (the tarball's `BUILDINFO` names the commit), and leaves three assets in `output/dist/`:
+
+| Asset | Contents |
+|-------|----------|
+| `boson-coturn-<version>.tar.gz` | `bin/turnserver-{linux-amd64,linux-arm64,darwin-arm64,darwin-x86_64}`, `licenses/` (coturn, OpenSSL, libevent, musl), `BUILDINFO` (versions, flags, commit, per-binary sha256) |
+| `SHA256SUMS` | sha256 of the tarball |
+| `SHA256SUMS.asc` | detached signature by the Boson release key |
+
+Signing follows `super-node-deployment/scripts/dev/make-release.sh --sign`: gpg signs with
+exactly the primary key, then `gpgv` verifies against the key **committed** at
+`keys/boson-release.asc`. A signature by the wrong key removes the `.asc` and fails the
+release. The private key never leaves your keyring; gpg may ask for its passphrase.
+
+The tarball is deterministic for the same binaries (sorted entries, commit-time mtimes,
+`root:root`, no macOS metadata, `gzip -n`), so repackaging gives the same sha256. The
+universal macOS binary is not shipped; it is just the two darwin slices combined.
+
+`make release` prints the matching `gh release create` command. Consumers (the Boson
+distribution build) pin the tarball's sha256, so a re-released tag with different bytes is
+rejected rather than silently picked up.
