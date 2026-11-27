@@ -36,7 +36,7 @@ RELEASE_BINARIES := \
 # BosonNetwork <support@bosonnetwork.io>, the key that signs every Boson
 # release. Its public half is committed at RELEASE_KEY_FILE, a copy of
 # super-node-deployment/assets/keys/boson-release.asc.
-RELEASE_KEY      := 5A012C930EEDB923B7AB4739A13B99C0C4AA495A
+RELEASE_KEY      := 103CB1D4C51DE54461C2419828E14DED565C5BDE
 RELEASE_KEY_FILE := keys/boson-release.asc
 
 .PHONY: licenses dist release release-check

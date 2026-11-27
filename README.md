@@ -76,7 +76,7 @@ can build natively without Docker or any macOS logic.
 | [`docker/Dockerfile.musl`](docker/Dockerfile.musl) | Toolchain image: installs deps, copies the `.mk` files in, runs `make -f linux.mk`. |
 | [`release.mk`](release.mk) | Release packaging (included by `Makefile`): license notices, tarball, `SHA256SUMS`, signature. |
 | [`scripts/sign-release.sh`](scripts/sign-release.sh) | Signs `SHA256SUMS` with the release key and verifies it against the committed key. |
-| [`keys/boson-release.asc`](keys/boson-release.asc) | The Boson release public key (`5A01 2C93 0EED B923 B7AB 4739 A13B 99C0 C4AA 495A`). |
+| [`keys/boson-release.asc`](keys/boson-release.asc) | The Boson release public key (`103C B1D4 C51D E544 61C2 4198 28E1 4DED 565C 5BDE`). |
 
 ## Component versions
 
